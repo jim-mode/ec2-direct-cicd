@@ -1,0 +1,138 @@
+name: PHP Deploy Common
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      image_tag:
+        required: true
+        type: string
+      target_env:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GIT_REF: ${{ inputs.ref }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
+      BASTION_IP: ${{ secrets.BASTION_IP }}
+      SSH_USER: deploy
+    steps:
+      - name: Output Input and Env
+        run: |
+          echo inputs.ref: ${{ inputs.ref }}
+          echo env.GIT_REF: ${{ env.GIT_REF }}
+          echo inputs.image_tag: ${{ inputs.image_tag }}
+          echo env.IMAGE_TAG: ${{ env.IMAGE_TAG }}
+
+      - name: Checkout 🛎
+        uses: actions/checkout@master
+        with:
+          ref: ${{ env.GIT_REF }}
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh/ && echo "$SSH_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KEY" > ~/id_rsa && ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "hostname"
+          rsync -avP ~/id_rsa ${SSH_USER}@${BASTION_IP}:/home/$SSH_USER/
+          ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "mkdir -p ~/.ssh && mv ~/id_rsa ~/.ssh/ && chmod 600 ~/.ssh/id_rsa"
+      - name: Verify Docker Exists
+        run: |
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
+          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./release/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
+      - name: Get Docker Images
+        run: |
+          echo "$(date): Deploy files to EC2"
+          cd release
+          sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-php:$IMAGE_TAG/g" docker-compose.yml
+          sed -i "s/NGINX_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-nginx:$IMAGE_TAG/g" docker-compose.yml
+          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./docker-compose.yml deploy@${APP_SERVER_01}:~/docker/docker-compose.yml
+
+
+
+      # - name: Remove native eb extension PHP composer config
+      #   run: rm .ebextensions/composer.config
+
+      # - name: Update file with branch & hash
+      #   id: set-version
+      #   run: |
+      #     branch="${GITHUB_REF#refs/heads/}"
+      #     cleanBranch="${branch//\//-}"
+      #     hash="$(git rev-parse --short "$GITHUB_SHA")"
+      #     date="$(date)"
+      #     sed -i "s/####/version\:\ $hash-$cleanBranch\ \ timestamp\:\ $date\ USING_DOCKER_PLATFORM/g" templates/default/homepage.html.twig
+
+      # - name: Configure AWS credentials
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: us-east-1
+
+      # - name: Login to Amazon ECR
+      #   id: login-ecr
+      #   uses: aws-actions/amazon-ecr-login@v1
+
+      # - name: Create deployment Zip with release directory
+      #   id: set-tags
+      #   env:
+      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      #   run: |
+      #     echo ECR Registry: $ECR_REGISTRY
+      #     echo ECR Tag: $IMAGE_TAG
+      #     echo Git Branch: ${{ inputs.ref }}
+
+      #     cd release
+      #     cp ../Dockerrun.aws.json .
+      #     cp -R ../public .
+      #     cp -R ../nginx .
+
+      #     sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/$ECR_REPOSITORY:$IMAGE_TAG/g" docker-compose.yml
+      #     cat docker-compose.yml
+      #     zip -r deploy.zip * .[^.]* -x "vendor/*"
+      #     mv deploy.zip ../
+
+      #     hash="$(git rev-parse --short "$GITHUB_SHA")"
+      #     echo ::set-output name=release_hash::$(echo $hash)
+
+      # - name: Get timestamp
+      #   uses: gerred/actions/current-time@master
+      #   id: current-time
+
+      # - name: Run string replace
+      #   uses: frabert/replace-string-action@master
+      #   id: format-time
+      #   with:
+      #     pattern: '[:\.]+'
+      #     string: "${{ steps.current-time.outputs.time }}"
+      #     replace-with: '-'
+      #     flags: 'g'
+
+      # - name: Beanstalk Deploy for app
+      #   uses: einaregilsson/beanstalk-deploy@v20
+      #   with:
+      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     application_name: ${{ secrets.BEANSTALK_APPLICATION_NAME }}
+      #     environment_name: ${{ secrets.BEANSTALK_ENVIRONMENT_NAME }}
+      #     use_existing_version_if_available: true
+      #     region: us-east-1
+      #     version_label: "${{ steps.set-tags.outputs.release_hash }}-${{ steps.format-time.outputs.replaced }}"
+      #     deployment_package: deploy.zip
+      #     wait_for_environment_recovery: 300
+
+      # - name: Deployed!
+      #   run: echo App deployed to ELB

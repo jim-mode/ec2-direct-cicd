@@ -3,12 +3,12 @@ version: "3.4"
 services:
   nginx:
     container_name: nginx
-    image: nginx:stable-alpine
+    image: NGINX_DOCKER_IMAGE
     ports:
       - 80:80
-    volumes:
-      - ./public:/var/www/html/public
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    # volumes:
+    #   - ./public:/var/www/html/public
+    #   - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php
     networks:
@@ -16,7 +16,7 @@ services:
 
   php:
     container_name: php
-    image: PROJECT_IMAGE
+    image: PHP_DOCKER_IMAGE
     networks:
       - web-network
 
