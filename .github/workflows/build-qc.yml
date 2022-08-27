@@ -60,6 +60,6 @@ jobs:
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
+      APP_SERVER_01_IP: ${{ secrets.APP_SERVER_01_IP }}
       BASTION_IP: ${{ secrets.BASTION_IP }}
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
