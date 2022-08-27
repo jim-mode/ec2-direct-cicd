@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
+      BASTION_IP: ${{ secrets.BASTION_IP }}
     steps:
       - name: Configure SSH
         env:
@@ -22,4 +23,6 @@ jobs:
           mkdir -p ~/.ssh/
           echo "$SSH_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh -o StrictHostKeyChecking=no $SSH_USER@$APP_SERVER_01 "hostname"
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP "hostname"
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'hostname'
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'echo "$SSH_KEY" > ~/.ssh/id_rsa'
