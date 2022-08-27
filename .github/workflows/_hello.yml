@@ -1,0 +1,25 @@
+name: Hello CI/CD
+
+on:
+  push:
+    branches:
+      - feature/init
+    secrets:
+      DEPLOY_SSH_PRIVATE_KEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_USER: deploy
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh $SSH_USER@$APP_SERVER_01 "hostname"
