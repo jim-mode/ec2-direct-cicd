@@ -25,4 +25,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP "hostname"
           ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'hostname'
-          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'echo "$SSH_KEY" > ~/.ssh/id_rsa'
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/abc'
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'echo ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }} > ~/def'
+          ssh -o StrictHostKeyChecking=no $SSH_USER@$BASTION_IP 'echo "${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa'
+
