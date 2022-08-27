@@ -29,7 +29,7 @@ jobs:
       - name: Verify Docker Exists
         run: |
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
-          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./.provision/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
+          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./release/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
       - name: Get Docker Images
         run: |
