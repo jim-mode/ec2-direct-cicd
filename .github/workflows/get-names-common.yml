@@ -1,0 +1,99 @@
+name: Get Build Tag/Branch Names
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  release:
+    types:
+      - published
+
+jobs:
+  job-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      output-tag: ${{ steps.get-tag.outputs.tag }}
+      output-clean-tag: ${{ steps.get-tag.outputs.clean-tag }}
+      output-branch: ${{ steps.get-branch.outputs.branch }}
+      output-clean-branch: ${{ steps.get-branch.outputs.clean-branch }}
+    steps:
+      - id: get-tag
+        run: |
+          tag="${GITHUB_REF/refs\/tags\//}"
+          cleanTag="${tag//\//-}"
+          echo tag $tag
+          echo cleanTag $cleanTag
+          echo "::set-output name=tag::$(echo $tag)"
+          echo "::set-output name=clean-tag::$(echo $cleanTag)"
+      - id: get-branch
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+          cleanBranch="${branch//\//-}"
+          echo branch $branch
+          echo cleanBranch $cleanBranch
+          echo "::set-output name=branch::$(echo $branch)"
+          echo "::set-output name=clean-branch::$(echo $cleanBranch)"
+
+  display-names:
+    needs: [job-tag]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎
+        uses: actions/checkout@master
+      - id: get-tag
+        run: |
+          tag="${GITHUB_REF/refs\/tags\//}"
+          cleanTag="${tag//\//-}"
+          echo tag $tag
+          echo cleanTag $cleanTag
+          echo ::set-output name=tag::$(echo $tag)
+          echo ::set-output name=clean-tag::$(echo $cleanTag)
+      - id: get-branch
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+          cleanBranch="${branch//\//-}"
+          echo branch $branch
+          echo cleanBranch $cleanBranch
+          echo ::set-output name=branch::$(echo $branch)
+          echo ::set-output name=clean-branch::$(echo $cleanBranch)
+      - name: Update file with branch & hash
+        id: set-version
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+          cleanBranch="${branch//\//-}"
+          hash="$(git rev-parse --short "$GITHUB_SHA")"
+          date="$(date)"
+          # sed -i "s/####/version\:\ $hash-$cleanBranch\ \ timestamp\:\ $date\ USING_DOCKER_PLATFORM/g" templates/default/homepage.html.twig
+          echo ::set-output name=short_sha::$(echo $hash)
+          echo ::set-output name=clean_branch::$(echo $cleanBranch)
+          echo ::set-output name=long_ref::${GITHUB_REF/refs\/tags\//}
+          echo ::set-output name=rev_v1::${GITHUB_REF#refs/*/}
+          echo ::set-output name=rev_v2::${GITHUB_REF:10}
+      - name: Display Branch and Tag
+        run: |
+          echo 01 github.action_ref - ${{ github.action_ref	}}
+          echo 02 github.base_ref - ${{ github.base_ref }}	
+          echo 03 github.head_ref - ${{ github.head_ref }}
+          echo 04 github.ref - ${{ github.ref }}
+          echo 05 github.ref_name - ${{ github.ref_name }}
+          echo 06 github.ref_type - ${{ github.ref_type }}
+          echo 07 github.sha - ${{ github.sha }}
+          echo 08 GITHUB_SHA - ${GITHUB_SHA}
+          echo 09 GITHUB_REF - ${GITHUB_REF}
+          echo 10 GITHUB_REF:10 - ${GITHUB_REF:10}
+          echo 11 GITHUB_REF:11 - ${GITHUB_REF:11}
+          echo 12 - ${GITHUB_REF/refs\/tags\//}
+          echo 13 - ${GITHUB_REF/refs\/heads\//}
+          echo 14 - ${GITHUB_REF#refs/heads/}
+          echo 15 - ${{ steps.get-tag.outputs.tag }}
+          echo 16 - ${{ steps.get-tag.outputs.clean-tag }}
+          echo 17 - ${{ steps.get-branch.outputs.branch }}
+          echo 18 - ${{ steps.get-branch.outputs.clean-branch }}
+          echo 19 - ${{ needs.job-tag.outputs.output-tag }}
+          echo 20 - ${{ needs.job-tag.outputs.output-clean-tag }}
+          echo 21 - ${{ needs.job-tag.outputs.output-branch }}
+          echo 22 - ${{ needs.job-tag.outputs.output-clean-branch }}
+          echo 23 - ${{ steps.set-version.outputs.short_sha }}
+          echo 24 - ${{ steps.set-version.outputs.rev_v1 }}
+          echo 25 - ${{ steps.set-version.outputs.clean_branch }}
+          echo 26 - ${{ steps.set-version.outputs.rev_v2 }}
+          echo 27 - ${{ steps.set-version.outputs.long_ref }}
