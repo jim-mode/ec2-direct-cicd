@@ -28,11 +28,12 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "mkdir -p ~/.ssh && mv ~/id_rsa ~/.ssh/ && chmod 600 ~/.ssh/id_rsa"
       - name: Verify Docker Exists
         run: |
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
           rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./.provision/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
       - name: Get Docker Images
         run: |
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
+          echo "TBD"
       
       # - name: Login to Amazon ECR
       #   id: login-ecr
