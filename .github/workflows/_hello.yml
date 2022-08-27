@@ -15,6 +15,8 @@ jobs:
       APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
       BASTION_IP: ${{ secrets.BASTION_IP }}
     steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v2.3.3
       - name: Configure SSH
         env:
           SSH_USER: deploy
@@ -34,5 +36,9 @@ jobs:
           SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
+          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./.provision/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
+          
+
 
 
