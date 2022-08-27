@@ -51,8 +51,6 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-      BEANSTALK_APPLICATION_NAME: ${{ secrets.BEANSTALK_APPLICATION_NAME }}
-      BEANSTALK_ENVIRONMENT_NAME: ${{ secrets.BEANSTALK_ENVIRONMENT_NAME }}
 
   # deploy:
   #   needs: [build, job-tag]
