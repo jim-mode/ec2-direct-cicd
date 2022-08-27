@@ -21,7 +21,7 @@ on:
         required: true
       BASTION_IP:
         required: true
-      SSH_KEY:
+      DEPLOY_SSH_PRIVATE_KEY:
         required: true
 
 jobs:
@@ -48,8 +48,6 @@ jobs:
           ref: ${{ env.GIT_REF }}
 
       - name: Configure SSH
-        env:
-          SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
         run: |
           mkdir -p ~/.ssh/ && echo "$SSH_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
           echo "$SSH_KEY" > ~/id_rsa && ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "hostname"
