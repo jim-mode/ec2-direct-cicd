@@ -36,9 +36,6 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
 
-      - name: Remove native eb extension PHP composer config
-        run: rm .ebextensions/composer.config
-
       - name: Update file with branch & hash
         id: set-version
         run: |
