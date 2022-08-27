@@ -1,0 +1,25 @@
+version: "3.4"
+
+services:
+  nginx:
+    container_name: nginx
+    image: nginx:stable-alpine
+    ports:
+      - 80:80
+    volumes:
+      - ./public:/var/www/html/public
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - php
+    networks:
+      - web-network
+
+  php:
+    container_name: php
+    image: PROJECT_IMAGE
+    networks:
+      - web-network
+
+networks:
+  web-network:
+    driver: bridge

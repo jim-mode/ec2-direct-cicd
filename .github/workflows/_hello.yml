@@ -1,0 +1,52 @@
+name: Hello CI/CD
+
+on:
+  push:
+    branches:
+      - feature/init
+    secrets:
+      DEPLOY_SSH_PRIVATE_KEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
+      BASTION_IP: ${{ secrets.BASTION_IP }}
+      SSH_USER: deploy
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v2.3.3
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh/ && echo "$SSH_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KEY" > ~/id_rsa && ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "hostname"
+          rsync -avP ~/id_rsa ${SSH_USER}@${BASTION_IP}:/home/$SSH_USER/
+          ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "mkdir -p ~/.ssh && mv ~/id_rsa ~/.ssh/ && chmod 600 ~/.ssh/id_rsa"
+      - name: Verify Docker Exists
+        run: |
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "mkdir -p ~/docker"
+          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./release/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
+      - name: Get Docker Images
+        run: |
+          echo "$(date): More Stuff Goes Here"
+      
+      # - name: Login to Amazon ECR
+      #   id: login-ecr
+      #   uses: aws-actions/amazon-ecr-login@v1
+
+      # Get Image SHA
+      # Docker Pull Image on App
+      # Verify
+        # Retry
+
+      # Download env + other files
+      # docker-compose up -d
+
+
+
+
