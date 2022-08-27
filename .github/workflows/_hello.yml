@@ -33,7 +33,7 @@ jobs:
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01} "~/verify_docker.sh"
       - name: Get Docker Images
         run: |
-          echo "TBD"
+          echo "$(date): More Stuff Goes Here"
       
       # - name: Login to Amazon ECR
       #   id: login-ecr
