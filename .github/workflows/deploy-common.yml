@@ -17,6 +17,12 @@ on:
         required: true
       AWS_SECRET_ACCESS_KEY:
         required: true
+      APP_SERVER_01:
+        required: true
+      BASTION_IP:
+        required: true
+      SSH_KEY:
+        required: true
 
 jobs:
   deploy:
@@ -26,6 +32,7 @@ jobs:
       IMAGE_TAG: ${{ inputs.image_tag }}
       APP_SERVER_01: ${{ secrets.APP_SERVER_01_IP }}
       BASTION_IP: ${{ secrets.BASTION_IP }}
+      SSH_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
       SSH_USER: deploy
     steps:
       - name: Output Input and Env
