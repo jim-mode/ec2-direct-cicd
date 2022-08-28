@@ -84,18 +84,17 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
           echo "$(date): Deploy files to EC2"
-          DOCKER_PW="$( aws ecr get-login-password --region us-east-1 )"
 
-          echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
-          echo "docker login -u AWS -p $(cat DOCKER_PW) $ECR_REGISTRY" > DOCKER_LOGIN
           cd release
           sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-php:$IMAGE_TAG/g" docker-compose.yml
           sed -i "s/NGINX_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-nginx:$IMAGE_TAG/g" docker-compose.yml
 
+          echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
+          echo "docker login -u AWS -p $(cat DOCKER_PW) $ECR_REGISTRY" > DOCKER_LOGIN
+
           for host in $APP_TARGET_HOST; do
             ssh deploy@${BASTION_HOST} "ssh-keyscan -H \"${host}\"" | tee -a ~/.ssh/known_hosts
-            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN deploy@${host}:~/docker
-            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./docker-compose.yml deploy@${host}:~/docker/docker-compose.yml
+            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN docker-compose.yml deploy@${host}:~/docker
 
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull"
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker-compose -f docker/docker-compose.yml up -d"
