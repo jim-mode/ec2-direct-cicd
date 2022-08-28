@@ -108,12 +108,11 @@ jobs:
             # Get PHP Docker Image ID
             HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
 
-            if [ -z "$PHP_IMAGE_ID" ]
-            then
+            if [ -z "$PHP_IMAGE_ID" ]; then
                 PHP_IMAGE_ID=$HOST_IMAGE_ID
                 echo "$(date) SET PHP Image ID $PHP_IMAGE_ID"
             else
-                if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ];
+                if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ]; then
                     echo "$(date) MATCHING PHP Image ID $PHP_IMAGE_ID"
                 else
                     echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
