@@ -48,7 +48,7 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
 
-      - name: Configure SSH & Docker Runtime
+      - name: Configure SSH & Verify Docker Runtime on Hosts
         run: |
           # Only assume deploy user is provisioned with sudo permission
 
@@ -96,8 +96,7 @@ jobs:
           sed -i "s/NGINX_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-nginx:$IMAGE_TAG/g" docker-compose.yml
 
           echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
-          echo "docker login -u AWS -p $(cat DOCKER_PW) $ECR_REGISTRY" > DOCKER_LOGIN
-
+          echo "cat DOCKER_PW | docker login -u AWS --password-stdin $ECR_REGISTRY" > DOCKER_LOGIN
 
           # Pull Images
           for host in $APP_TARGET_HOST; do
@@ -107,13 +106,28 @@ jobs:
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull -q"
 
             # Get PHP Docker Image ID
-            IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
+            HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
 
-            echo "$(date) ####"
-            echo "$(date) PHP Image ID $IMAGE_ID"
-            echo "$(date) ####"
+            if [ -z "$PHP_IMAGE_ID" ]
+            then
+                PHP_IMAGE_ID=$HOST_IMAGE_ID
+                echo "$(date) SET PHP Image ID $PHP_IMAGE_ID"
+            else
+                if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ];
+                    echo "$(date) MATCHING PHP Image ID $PHP_IMAGE_ID"
+                else
+                    echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
+                    echo "#### #### #### #### #### #### #### ####"
+                    echo "EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID"
+                    echo "#### #### #### #### #### #### #### ####"
+                    echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
+                    # TODO: Retry
+                fi
+            fi
           done
 
+      - name: Execute Docker Compose Up
+        run: |
           # Run Docker
           for host in $APP_TARGET_HOST; do
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker-compose -f docker/docker-compose.yml up -d"
