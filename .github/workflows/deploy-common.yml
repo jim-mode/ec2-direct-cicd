@@ -9,17 +9,17 @@ on:
       image_tag:
         required: true
         type: string
-      target_env:
+      bastion_host:
+        description: "Bastion server address"
+        required: true
+        type: string
+      app_target:
         required: true
         type: string
     secrets:
       AWS_ACCESS_KEY_ID:
         required: true
       AWS_SECRET_ACCESS_KEY:
-        required: true
-      APP_SERVER_01_IP:
-        required: true
-      BASTION_IP:
         required: true
       DEPLOY_SSH_PRIVATE_KEY:
         required: true
@@ -30,8 +30,9 @@ jobs:
     env:
       GIT_REF: ${{ inputs.ref }}
       IMAGE_TAG: ${{ inputs.image_tag }}
-      APP_SERVER_01_IP: ${{ secrets.APP_SERVER_01_IP }}
-      BASTION_IP: ${{ secrets.BASTION_IP }}
+      APP_TARGET_HOST: ${{ inputs.app_target }}
+      # APP_SERVER_01_IP: ${{ secrets.APP_SERVER_01_IP }}
+      BASTION_HOST: ${{ inputs.bastion_host }}
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
       SSH_USER: deploy
     steps:
@@ -47,18 +48,25 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
 
-      - name: Configure SSH
+      - name: Configure SSH & Docker Runtime
         run: |
+          
+          # Setup Github Action Host & Bastion Box
           mkdir -p ~/.ssh/ && echo "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa && chmod 600 ~/.ssh/id_rsa
-          echo "$DEPLOY_SSH_PRIVATE_KEY" > ~/id_rsa && ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "hostname"
-          rsync -avP ~/id_rsa ${SSH_USER}@${BASTION_IP}:/home/$SSH_USER/
-          ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_IP} "mkdir -p ~/.ssh && mv ~/id_rsa ~/.ssh/ && chmod 600 ~/.ssh/id_rsa"
+          echo "$DEPLOY_SSH_PRIVATE_KEY" > ~/id_rsa && ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_HOST} "hostname"
+          rsync -avP ~/id_rsa ${SSH_USER}@${BASTION_HOST}:/home/$SSH_USER/
+          ssh -o StrictHostKeyChecking=no ${SSH_USER}@${BASTION_HOST} "mkdir -p ~/.ssh && mv ~/id_rsa ~/.ssh/ && chmod 600 ~/.ssh/id_rsa"
 
-      - name: Verify Docker Runtime Exists
-        run: |
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "mkdir -p ~/docker"
-          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./release/verify_docker.sh deploy@${APP_SERVER_01_IP}:~/verify_docker.sh
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "~/verify_docker.sh"
+          # Setup App Servers
+          for host in $APP_TARGET_HOST; do
+            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "mkdir -p ~/docker"
+            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${host}:~/verify_docker.sh
+            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "~/verify_docker.sh"
+          done
+
+          # ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${APP_SERVER_01_IP} "mkdir -p ~/docker"
+          # rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${APP_SERVER_01_IP}:~/verify_docker.sh
+          # ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${APP_SERVER_01_IP} "~/verify_docker.sh"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -80,57 +88,26 @@ jobs:
 
           echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
           echo "docker login -u AWS -p $(cat DOCKER_PW) $ECR_REGISTRY" > DOCKER_LOGIN
-          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' DOCKER_PW DOCKER_LOGIN deploy@${APP_SERVER_01_IP}:~/docker
-          
           cd release
           sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-php:$IMAGE_TAG/g" docker-compose.yml
           sed -i "s/NGINX_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-nginx:$IMAGE_TAG/g" docker-compose.yml
-          rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./docker-compose.yml deploy@${APP_SERVER_01_IP}:~/docker/docker-compose.yml
 
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull"
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker-compose -f docker/docker-compose.yml up -d"
-          
-          IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker images | grep ec2-cicd-php | awk '{print $3}'")
-          echo "$(date) ####"
-          echo "$(date) PHP Image ID $IMAGE_ID"
-          echo "$(date) ####"
+          for host in $APP_TARGET_HOST; do
+            ssh deploy@${BASTION_HOST} "ssh-keyscan -H \"${host}\"" | tee -a ~/.ssh/known_hosts
+            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN deploy@${host}:~/docker
+            rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./docker-compose.yml deploy@${host}:~/docker/docker-compose.yml
+
+            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull"
+            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker-compose -f docker/docker-compose.yml up -d"
+            
+            IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
+
+            echo "$(date) ####"
+            echo "$(date) PHP Image ID $IMAGE_ID"
+            echo "$(date) ####"
+          done
 
 
-      # - name: Remove native eb extension PHP composer config
-      #   run: rm .ebextensions/composer.config
-
-      # - name: Configure AWS credentials
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     aws-region: us-east-1
-
-      # - name: Login to Amazon ECR
-      #   id: login-ecr
-      #   uses: aws-actions/amazon-ecr-login@v1
-
-      # - name: Create deployment Zip with release directory
-      #   id: set-tags
-      #   env:
-      #     ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-      #   run: |
-      #     echo ECR Registry: $ECR_REGISTRY
-      #     echo ECR Tag: $IMAGE_TAG
-      #     echo Git Branch: ${{ inputs.ref }}
-
-      #     cd release
-      #     cp ../Dockerrun.aws.json .
-      #     cp -R ../public .
-      #     cp -R ../nginx .
-
-      #     sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/$ECR_REPOSITORY:$IMAGE_TAG/g" docker-compose.yml
-      #     cat docker-compose.yml
-      #     zip -r deploy.zip * .[^.]* -x "vendor/*"
-      #     mv deploy.zip ../
-
-      #     hash="$(git rev-parse --short "$GITHUB_SHA")"
-      #     echo ::set-output name=release_hash::$(echo $hash)
 
       # - name: Get timestamp
       #   uses: gerred/actions/current-time@master

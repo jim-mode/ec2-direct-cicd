@@ -56,10 +56,9 @@ jobs:
     with:
       ref: ${{ needs.job-tag.outputs.output-branch }}
       image_tag: latest
-      target_env: ''
+      bastion_host: 44.195.49.80
+      app_target: 172.31.10.105 172.31.2.94
     secrets:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      APP_SERVER_01_IP: ${{ secrets.APP_SERVER_01_IP }}
-      BASTION_IP: ${{ secrets.BASTION_IP }}
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
