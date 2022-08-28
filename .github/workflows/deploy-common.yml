@@ -80,7 +80,6 @@ jobs:
 
           echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
           echo "docker login -u AWS -p $(cat DOCKER_PW) $ECR_REGISTRY" > DOCKER_LOGIN
-
           rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' DOCKER_PW DOCKER_LOGIN deploy@${APP_SERVER_01_IP}:~/docker
           
           cd release
@@ -90,20 +89,18 @@ jobs:
 
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull"
           
+          IMAGE_ID = $(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker images | grep ec2-cicd-php | awk '{print $3}'")
+          echo "$(date) ####"
+          echo "$(date) PHP Image ID $IMAGE_ID"
+          echo "$(date) ####"
+
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker-compose -f docker/docker-compose.yml up -d"
+          
 
 
 
       # - name: Remove native eb extension PHP composer config
       #   run: rm .ebextensions/composer.config
-
-      # - name: Update file with branch & hash
-      #   id: set-version
-      #   run: |
-      #     branch="${GITHUB_REF#refs/heads/}"
-      #     cleanBranch="${branch//\//-}"
-      #     hash="$(git rev-parse --short "$GITHUB_SHA")"
-      #     date="$(date)"
-      #     sed -i "s/####/version\:\ $hash-$cleanBranch\ \ timestamp\:\ $date\ USING_DOCKER_PLATFORM/g" templates/default/homepage.html.twig
 
       # - name: Configure AWS credentials
       #   uses: aws-actions/configure-aws-credentials@v1
