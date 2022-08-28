@@ -88,15 +88,12 @@ jobs:
           rsync -azv -e 'ssh -A -J deploy@${BASTION_IP}' ./docker-compose.yml deploy@${APP_SERVER_01_IP}:~/docker/docker-compose.yml
 
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull"
+          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker-compose -f docker/docker-compose.yml up -d"
           
-          IMAGE_ID = $(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker images | grep ec2-cicd-php | awk '{print $3}'")
+          IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker images | grep ec2-cicd-php | awk '{print $3}'")
           echo "$(date) ####"
           echo "$(date) PHP Image ID $IMAGE_ID"
           echo "$(date) ####"
-
-          ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_IP} deploy@${APP_SERVER_01_IP} "docker-compose -f docker/docker-compose.yml up -d"
-          
-
 
 
       # - name: Remove native eb extension PHP composer config
