@@ -23,6 +23,8 @@ on:
         required: true
       DEPLOY_SSH_PRIVATE_KEY:
         required: true
+      MS_TEAMS_WEBHOOK_URI:
+        required: true
 
 jobs:
   deploy:
