@@ -42,6 +42,14 @@ jobs:
           echo inputs.image_tag: ${{ inputs.image_tag }}
           echo env.IMAGE_TAG: ${{ env.IMAGE_TAG }}
 
+      - name: CI Team Notification
+        uses: toko-bifrost/ms-teams-deploy-card@master #  or "./" if in a local set-up
+        if: always()
+        with:
+          github-token: ${{ github.token }}
+          webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          show-on-failure: true
+
       - name: Checkout 🛎
         uses: actions/checkout@master
         with:
@@ -122,6 +130,9 @@ jobs:
               break
             else
               echo "$(date) #### Some host contain mismatch docker images. Attempt $c"
+              if [ $c == 3 ]; then
+                exit 1
+              fi
             fi
           done
 
@@ -137,5 +148,9 @@ jobs:
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker system prune --all --force && docker volume prune --force && docker network prune --force"
           done
 
-      - name: Deployed!
-        run: echo App deployed to all hosts
+      - name: Final Team Notify!
+        uses: toko-bifrost/ms-teams-deploy-card@master #  or "./" if in a local set-up
+        if: always()
+        with:
+          github-token: ${{ github.token }}
+          webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
