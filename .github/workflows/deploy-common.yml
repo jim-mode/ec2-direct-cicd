@@ -48,7 +48,7 @@ jobs:
         with:
           ref: ${{ env.GIT_REF }}
 
-      - name: Configure SSH & Verify Docker Runtime on Hosts
+      - name: Configure SSH & Verify / Install Docker Runtime on Hosts
         run: |
           # Only assume deploy user is provisioned with sudo permission
 
@@ -85,7 +85,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Get Docker Images from ECR
+      - name: ~~ Get Docker Images from ECR + Triple Verify ~~
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
@@ -98,30 +98,42 @@ jobs:
           echo "$( aws ecr get-login-password --region us-east-1 )" > DOCKER_PW
           echo "cat ~/docker/DOCKER_PW | docker login -u AWS --password-stdin $ECR_REGISTRY" > DOCKER_LOGIN
 
-          # Pull Images
-          for host in $APP_TARGET_HOST; do
+          for (( c=1; c<=3; c++ ))
+          do
+            target_host_counter=0
+            match_host_counter=1
+            # Pull Images
+            for host in $APP_TARGET_HOST; do
+              ((target_host_counter+=1))
+              # ssh deploy@${BASTION_HOST} "ssh-keyscan -H \"${host}\"" | tee -a ~/.ssh/known_hosts
+              rsync -azq -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN docker-compose.yml deploy@${host}:~/docker
+              ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull -q"
 
-            # ssh deploy@${BASTION_HOST} "ssh-keyscan -H \"${host}\"" | tee -a ~/.ssh/known_hosts
-            rsync -azq -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN docker-compose.yml deploy@${host}:~/docker
-            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull -q"
+              # Get PHP Docker Image ID
+              HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
 
-            # Get PHP Docker Image ID
-            HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
-
-            if [ -z "$PHP_IMAGE_ID" ]; then
-                PHP_IMAGE_ID=$HOST_IMAGE_ID
-                echo "$(date) SET PHP Image ID $PHP_IMAGE_ID"
+              if [ -z "$PHP_IMAGE_ID" ]; then
+                  PHP_IMAGE_ID=$HOST_IMAGE_ID
+                  echo "$(date) #### SET PHP Image ID $PHP_IMAGE_ID"
+              else
+                  if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ]; then
+                      echo "$(date) #### MATCHING PHP Image ID $PHP_IMAGE_ID"
+                      ((match_host_counter+=1))
+                  else
+                      echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
+                      echo "#### #### #### #### #### #### #### ####"
+                      echo "#### EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID ON HOST $host"
+                      echo "#### #### #### #### #### #### #### ####"
+                      echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
+                      # TODO: Retry
+                  fi
+              fi
+            done
+            if [ $target_host_counter == $match_host_counter ]; then
+              echo "$(date) #### All $target_host_counter hosts contain same docker image. Attempt $c"
+              break
             else
-                if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ]; then
-                    echo "$(date) MATCHING PHP Image ID $PHP_IMAGE_ID"
-                else
-                    echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
-                    echo "#### #### #### #### #### #### #### ####"
-                    echo "EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID"
-                    echo "#### #### #### #### #### #### #### ####"
-                    echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
-                    # TODO: Retry
-                fi
+              echo "$(date) #### Some host contain mismatch docker images. Attempt $c"
             fi
           done
 
