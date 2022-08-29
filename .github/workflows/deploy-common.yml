@@ -31,7 +31,6 @@ jobs:
       GIT_REF: ${{ inputs.ref }}
       IMAGE_TAG: ${{ inputs.image_tag }}
       APP_TARGET_HOST: ${{ inputs.app_target }}
-      # APP_SERVER_01_IP: ${{ secrets.APP_SERVER_01_IP }}
       BASTION_HOST: ${{ inputs.bastion_host }}
       DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
       SSH_USER: deploy
@@ -63,17 +62,8 @@ jobs:
           # Setup App Servers
           for host in $APP_TARGET_HOST; do
             rsync -azq -e 'ssh -o StrictHostKeyChecking=no -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${host}:~/verify_docker.sh
-
-            # ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "mkdir -p ~/docker"
-            # rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${host}:~/verify_docker.sh
-
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "mkdir -p ~/docker && ~/verify_docker.sh && rm -rf ~/verify_docker.sh"
           done
-
-          # ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${APP_SERVER_01_IP} "mkdir -p ~/docker"
-          # rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${APP_SERVER_01_IP}:~/verify_docker.sh
-          # ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${APP_SERVER_01_IP} "~/verify_docker.sh"
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -110,7 +100,7 @@ jobs:
               ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull -q"
 
               # Get PHP Docker Image ID
-              HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep latest" | awk '{print $3}')
+              HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep $IMAGE_TAG" | awk '{print $3}')
 
               if [ -z "$PHP_IMAGE_ID" ]; then
                   PHP_IMAGE_ID=$HOST_IMAGE_ID
@@ -125,7 +115,6 @@ jobs:
                       echo "#### EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID ON HOST $host"
                       echo "#### #### #### #### #### #### #### ####"
                       echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
-                      # TODO: Retry
                   fi
               fi
             done
@@ -139,40 +128,15 @@ jobs:
 
       - name: Execute Docker Compose Up
         run: |
-          # Run Docker
           for host in $APP_TARGET_HOST; do
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker-compose -f docker/docker-compose.yml up -d"
           done
 
+      - name: Clean up docker images / volumes / network
+        run: |
+          for host in $APP_TARGET_HOST; do
+            ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker system prune --all --force && docker volume prune --force && docker network prune --force"
+          done
 
-
-
-
-      # - name: Get timestamp
-      #   uses: gerred/actions/current-time@master
-      #   id: current-time
-
-      # - name: Run string replace
-      #   uses: frabert/replace-string-action@master
-      #   id: format-time
-      #   with:
-      #     pattern: '[:\.]+'
-      #     string: "${{ steps.current-time.outputs.time }}"
-      #     replace-with: '-'
-      #     flags: 'g'
-
-      # - name: Beanstalk Deploy for app
-      #   uses: einaregilsson/beanstalk-deploy@v20
-      #   with:
-      #     aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     application_name: ${{ secrets.BEANSTALK_APPLICATION_NAME }}
-      #     environment_name: ${{ secrets.BEANSTALK_ENVIRONMENT_NAME }}
-      #     use_existing_version_if_available: true
-      #     region: us-east-1
-      #     version_label: "${{ steps.set-tags.outputs.release_hash }}-${{ steps.format-time.outputs.replaced }}"
-      #     deployment_package: deploy.zip
-      #     wait_for_environment_recovery: 300
-
-      # - name: Deployed!
-      #   run: echo App deployed to ELB
+      - name: Deployed!
+        run: echo App deployed to all hosts
