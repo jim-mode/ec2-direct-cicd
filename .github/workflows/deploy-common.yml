@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "$(date): Deploy files to EC2"
 
-          # Update files for host EC2 to pull docker images 
+          # Create / Update files for host EC2 to pull target docker images
           cd release
           sed -i "s/PHP_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-php:$IMAGE_TAG/g" docker-compose.yml
           sed -i "s/NGINX_DOCKER_IMAGE/$ECR_REGISTRY\/ec2-cicd-nginx:$IMAGE_TAG/g" docker-compose.yml
@@ -92,29 +92,28 @@ jobs:
           do
             target_host_counter=0
             match_host_counter=1
-            # Pull Images
+
+            # Loop through all EC2 hosts to pull images based on docker-compose
             for host in $APP_TARGET_HOST; do
               ((target_host_counter+=1))
-              # ssh deploy@${BASTION_HOST} "ssh-keyscan -H \"${host}\"" | tee -a ~/.ssh/known_hosts
+
+              # Transfer files to host and execute docker pull
               rsync -azq -e 'ssh -A -J deploy@${BASTION_HOST}' DOCKER_PW DOCKER_LOGIN docker-compose.yml deploy@${host}:~/docker
               ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "/bin/bash ~/docker/DOCKER_LOGIN && docker-compose -f docker/docker-compose.yml pull -q"
 
-              # Get PHP Docker Image ID
+              # Get PHP Docker Image ID from host
               HOST_IMAGE_ID=$(ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker images | grep ec2-cicd-php | grep $IMAGE_TAG" | awk '{print $3}')
 
               if [ -z "$PHP_IMAGE_ID" ]; then
                   PHP_IMAGE_ID=$HOST_IMAGE_ID
-                  echo "$(date) #### SET PHP Image ID $PHP_IMAGE_ID"
+                  echo "$(date) #### First host; SET PHP Image ID $PHP_IMAGE_ID for host $host"
               else
                   if [ "$PHP_IMAGE_ID" = "$HOST_IMAGE_ID" ]; then
                       echo "$(date) #### MATCHING PHP Image ID $PHP_IMAGE_ID"
                       ((match_host_counter+=1))
                   else
                       echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
-                      echo "#### #### #### #### #### #### #### ####"
-                      echo "#### EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID ON HOST $host"
-                      echo "#### #### #### #### #### #### #### ####"
-                      echo "$(date) #### PHP IMAGES ARE NOT MATCHING!!"
+                      echo "$(date) #### EXPECTED $PHP_IMAGE_ID ACTUAL $HOST_IMAGE_ID on host $host"
                   fi
               fi
             done
