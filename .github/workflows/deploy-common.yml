@@ -147,10 +147,3 @@ jobs:
           for host in $APP_TARGET_HOST; do
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker system prune --all --force && docker volume prune --force && docker network prune --force"
           done
-
-      - name: Final Team Notify!
-        uses: toko-bifrost/ms-teams-deploy-card@master #  or "./" if in a local set-up
-        if: always()
-        with:
-          github-token: ${{ github.token }}
-          webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
