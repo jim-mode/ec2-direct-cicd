@@ -52,6 +52,15 @@ jobs:
           webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
           show-on-failure: true
 
+      - name: Team Notify Start
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ github.token }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: Start
+          notification-color: 28a745
+          timezone: America/Chicago
+
       - name: Checkout 🛎
         uses: actions/checkout@master
         with:
@@ -149,3 +158,12 @@ jobs:
           for host in $APP_TARGET_HOST; do
             ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${host} "docker system prune --all --force && docker volume prune --force && docker network prune --force"
           done
+
+      - name: Team Notify End
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ github.token }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: End
+          notification-color: 28a745
+          timezone: America/Chicago

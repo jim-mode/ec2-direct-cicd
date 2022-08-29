@@ -3,7 +3,7 @@ name: Hello CI/CD
 on:
   push:
     branches:
-      - main
+      - feature/building-dockers
     secrets:
       DEPLOY_SSH_PRIVATE_KEY:
         required: true
@@ -36,10 +36,19 @@ jobs:
           rsync -azv -e 'ssh -A -J deploy@${BASTION_HOST}' ./release/verify_docker.sh deploy@${APP_SERVER_01}:~/verify_docker.sh
           ssh -o StrictHostKeyChecking=no -J deploy@${BASTION_HOST} deploy@${APP_SERVER_01} "~/verify_docker.sh"
 
-      - name: Team Notify
+      - name: Team Notify 1
         uses: toko-bifrost/ms-teams-deploy-card@master #  or "./" if in a local set-up
         if: always()
         with:
           github-token: ${{ github.token }}
           webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
           show-on-failure: true
+
+      - name: Team Notify 2
+        uses: jdcargile/ms-teams-notification@v1.3
+        with:
+          github-token: ${{ github.token }}
+          ms-teams-webhook-uri: ${{ secrets.MS_TEAMS_WEBHOOK_URI }}
+          notification-summary: Aloha
+          notification-color: 17a2b8
+          timezone: America/Chicago
